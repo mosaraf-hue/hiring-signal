@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hiring Signal — Amazon Jobs Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #0f1216;
+    --panel: #171b21;
+    --panel-2: #1d222a;
+    --line: #2a303a;
+    --text: #e7eaee;
+    --muted: #8b93a1;
+    --amber: #ffb238;
+    --teal: #3ddc97;
+    --red: #ff5c6c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1240px; margin:0 auto; padding:28px 24px 60px;}
+
+  header{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:24px; gap:16px; flex-wrap:wrap;}
+  h1{
+    font-family:'Space Grotesk', sans-serif; font-weight:700;
+    font-size:28px; margin:0 0 4px; letter-spacing:-0.01em;
+    display:flex; align-items:center; gap:10px;
+  }
+  .pulse-dot{
+    width:10px; height:10px; border-radius:50%; background:var(--amber);
+    box-shadow:0 0 0 0 rgba(255,178,56,0.6);
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(255,178,56,0.55);}
+    70%{box-shadow:0 0 0 10px rgba(255,178,56,0);}
+    100%{box-shadow:0 0 0 0 rgba(255,178,56,0);}
+  }
+  .subtitle{color:var(--muted); font-size:13.5px;}
+  .meta{font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--muted); text-align:right;}
+  .meta b{color:var(--text);}
+
+  .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:22px;}
+  .kpi{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:16px 18px;
+  }
+  .kpi .label{font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px;}
+  .kpi .value{font-family:'IBM Plex Mono', monospace; font-size:26px; font-weight:500;}
+  .kpi .value.up{color:var(--teal);}
+  .kpi .sub{font-size:12px; color:var(--muted); margin-top:4px;}
+
+  .grid{display:grid; grid-template-columns:1.4fr 1fr; gap:16px; margin-bottom:16px;}
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:18px 20px;
+  }
+  .panel h2{
+    font-family:'Space Grotesk', sans-serif; font-size:14.5px; margin:0 0 14px;
+    font-weight:700; letter-spacing:0.01em; display:flex; justify-content:space-between; align-items:center;
+  }
+  .panel h2 .tag{font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--muted); font-weight:400;}
+  canvas{max-height:280px;}
+
+  .controls{
+    display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center;
+  }
+  select, input[type="text"]{
+    background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    border-radius:7px; padding:8px 10px; font-family:'Inter'; font-size:13px;
+  }
+  select:focus, input:focus{outline:1px solid var(--amber);}
+  .controls label{font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-right:6px;}
+
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th{
+    text-align:left; padding:9px 10px; color:var(--muted); font-weight:600;
+    font-size:11px; text-transform:uppercase; letter-spacing:0.05em;
+    border-bottom:1px solid var(--line); cursor:pointer; user-select:none;
+  }
+  th:hover{color:var(--text);}
+  td{padding:9px 10px; border-bottom:1px solid #20252d;}
+  tr:hover td{background:#1a1f27;}
+  .status-open{color:var(--teal); font-family:'IBM Plex Mono',monospace; font-size:11.5px;}
+  .status-closed{color:var(--muted); font-family:'IBM Plex Mono',monospace; font-size:11.5px;}
+  .badge-new{
+    background:rgba(255,178,56,0.15); color:var(--amber); border:1px solid rgba(255,178,56,0.4);
+    font-size:10px; padding:1px 6px; border-radius:10px; margin-left:6px; font-family:'IBM Plex Mono',monospace;
+  }
+  a.job-link{color:var(--text); text-decoration:none; border-bottom:1px dotted var(--muted);}
+  a.job-link:hover{color:var(--amber); border-color:var(--amber);}
+
+  .table-wrap{max-height:520px; overflow:auto; border:1px solid var(--line); border-radius:10px;}
+  .table-wrap table{margin:0;}
+  .table-wrap thead th{position:sticky; top:0; background:var(--panel); z-index:1;}
+
+  .empty{
+    text-align:center; padding:60px 20px; color:var(--muted); font-size:13.5px;
+  }
+  ::-webkit-scrollbar{width:8px; height:8px;}
+  ::-webkit-scrollbar-thumb{background:#333a45; border-radius:4px;}
+
+  @media (max-width:900px){
+    .kpis{grid-template-columns:repeat(2,1fr);}
+    .grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1><span class="pulse-dot"></span>Hiring Signal</h1>
+      <div class="subtitle">Amazon.jobs postings — tracked as a proxy for team budget &amp; growth</div>
+    </div>
+    <div class="meta" id="meta">loading…</div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Postings over time <span class="tag">new listings / week, by category</span></h2>
+      <canvas id="trendChart"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Open roles by location <span class="tag">top 12</span></h2>
+      <canvas id="locChart"></canvas>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Job list <span class="tag" id="rowcount"></span></h2>
+    <div class="controls">
+      <span><label>Category</label>
+      <select id="fCategory"><option value="">All</option></select></span>
+      <span><label>Location</label>
+      <select id="fLocation"><option value="">All</option></select></span>
+      <span><label>Status</label>
+      <select id="fStatus">
+        <option value="">All</option>
+        <option value="open" selected>Open only</option>
+        <option value="closed">Closed only</option>
+      </select></span>
+      <span><label>Window</label>
+      <select id="fWindow">
+        <option value="0">All time</option>
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+      </select></span>
+      <span><label>Search</label>
+      <input type="text" id="fSearch" placeholder="title or team…" /></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-key="title">Title</th>
+            <th data-key="category">Category</th>
+            <th data-key="team">Team</th>
+            <th data-key="location">Location</th>
+            <th data-key="first_seen">First seen</th>
+            <th data-key="status">Status</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = ['#ffb238','#3ddc97','#5b8def','#ff5c6c','#c792ea','#7fd3ff','#f5a97f','#8b93a1','#ffdd57','#6ee7b7'];
+
+let ALL_JOBS = [];
+
+async function loadData(){
+  try{
+    const res = await fetch('../data/jobs.json', {cache:'no-store'});
+    if(!res.ok) throw new Error('fetch failed');
+    const json = await res.json();
+    return json;
+  }catch(e){
+    // fallback: try same-folder path (in case dashboard is served from repo root)
+    try{
+      const res2 = await fetch('./data/jobs.json', {cache:'no-store'});
+      if(res2.ok) return await res2.json();
+    }catch(e2){}
+    document.getElementById('meta').innerText = 'No data/jobs.json found yet — run scraper.py once.';
+    return {jobs:{}, last_run:null};
+  }
+}
+
+function daysAgo(dateStr){
+  const d = new Date(dateStr);
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+}
+
+function isoWeek(dateStr){
+  const d = new Date(dateStr);
+  const onejan = new Date(d.getFullYear(),0,1);
+  const week = Math.ceil((((d - onejan) / 86400000) + onejan.getDay()+1)/7);
+  return `${d.getFullYear()}-W${String(week).padStart(2,'0')}`;
+}
+
+function populateSelect(id, values){
+  const sel = document.getElementById(id);
+  values.sort().forEach(v=>{
+    const o = document.createElement('option');
+    o.value = v; o.textContent = v;
+    sel.appendChild(o);
+  });
+}
+
+function renderKPIs(jobs){
+  const open = jobs.filter(j=>j.status==='open');
+  const newThisWeek = jobs.filter(j=>daysAgo(j.first_seen) <= 7);
+
+  const catCounts = {};
+  open.forEach(j=>catCounts[j.category]=(catCounts[j.category]||0)+1);
+  const catNewCounts = {};
+  newThisWeek.forEach(j=>catNewCounts[j.category]=(catNewCounts[j.category]||0)+1);
+  let topGrowing = Object.entries(catNewCounts).sort((a,b)=>b[1]-a[1])[0];
+
+  const locCounts = {};
+  open.forEach(j=>locCounts[j.location]=(locCounts[j.location]||0)+1);
+  let topLoc = Object.entries(locCounts).sort((a,b)=>b[1]-a[1])[0];
+
+  const kpis = [
+    {label:'Open roles tracked', value: open.length, sub:`${jobs.length} total ever seen`},
+    {label:'New in last 7 days', value: newThisWeek.length, up:true, sub:'fresh postings = fresh budget'},
+    {label:'Fastest-growing category', value: topGrowing ? topGrowing[1] : '—', sub: topGrowing ? topGrowing[0] : 'no data', up:true},
+    {label:'Top location right now', value: topLoc ? topLoc[1] : '—', sub: topLoc ? topLoc[0] : 'no data'},
+  ];
+
+  document.getElementById('kpis').innerHTML = kpis.map(k=>`
+    <div class="kpi">
+      <div class="label">${k.label}</div>
+      <div class="value ${k.up?'up':''}">${k.value}</div>
+      <div class="sub">${k.sub}</div>
+    </div>`).join('');
+}
+
+function renderTrendChart(jobs){
+  const cats = [...new Set(jobs.map(j=>j.category))];
+  const weeks = [...new Set(jobs.map(j=>isoWeek(j.first_seen)))].sort().slice(-14);
+
+  const datasets = cats.map((cat,i)=>{
+    const data = weeks.map(w=> jobs.filter(j=>j.category===cat && isoWeek(j.first_seen)===w).length );
+    return {
+      label: cat, data,
+      borderColor: COLORS[i%COLORS.length],
+      backgroundColor: COLORS[i%COLORS.length]+'22',
+      tension:0.3, fill:false, pointRadius:2, borderWidth:2,
+    };
+  });
+
+  new Chart(document.getElementById('trendChart'), {
+    type:'line',
+    data:{labels:weeks, datasets},
+    options:{
+      responsive:true,
+      interaction:{mode:'index', intersect:false},
+      plugins:{legend:{labels:{color:'#8b93a1', font:{size:10.5, family:'IBM Plex Mono'}, boxWidth:10}}},
+      scales:{
+        x:{ticks:{color:'#8b93a1', font:{size:10}}, grid:{color:'#20252d'}},
+        y:{ticks:{color:'#8b93a1', font:{size:10}}, grid:{color:'#20252d'}, beginAtZero:true}
+      }
+    }
+  });
+}
+
+function renderLocChart(jobs){
+  const open = jobs.filter(j=>j.status==='open');
+  const counts = {};
+  open.forEach(j=>counts[j.location]=(counts[j.location]||0)+1);
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,12);
+
+  new Chart(document.getElementById('locChart'), {
+    type:'bar',
+    data:{
+      labels: sorted.map(s=>s[0]),
+      datasets:[{data: sorted.map(s=>s[1]), backgroundColor:'#ffb238', borderRadius:4}]
+    },
+    options:{
+      indexAxis:'y',
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#8b93a1', font:{size:10}}, grid:{color:'#20252d'}, beginAtZero:true},
+        y:{ticks:{color:'#e7eaee', font:{size:11}}, grid:{display:false}}
+      }
+    }
+  });
+}
+
+let sortKey='first_seen', sortDir=-1;
+
+function applyFiltersAndRender(){
+  const cat = document.getElementById('fCategory').value;
+  const loc = document.getElementById('fLocation').value;
+  const status = document.getElementById('fStatus').value;
+  const win = parseInt(document.getElementById('fWindow').value);
+  const q = document.getElementById('fSearch').value.toLowerCase();
+
+  let rows = ALL_JOBS.filter(j=>{
+    if(cat && j.category!==cat) return false;
+    if(loc && j.location!==loc) return false;
+    if(status && j.status!==status) return false;
+    if(win && daysAgo(j.first_seen) > win) return false;
+    if(q && !(`${j.title} ${j.team}`.toLowerCase().includes(q))) return false;
+    return true;
+  });
+
+  rows.sort((a,b)=>{
+    let av=a[sortKey]||'', bv=b[sortKey]||'';
+    return av>bv ? sortDir : av<bv ? -sortDir : 0;
+  });
+
+  document.getElementById('rowcount').textContent = `${rows.length} shown`;
+  document.getElementById('tbody').innerHTML = rows.slice(0,400).map(j=>{
+    const isNew = daysAgo(j.first_seen) <= 7 && j.status==='open';
+    return `<tr>
+      <td>${j.url ? `<a class="job-link" href="${j.url}" target="_blank">${j.title||'(untitled)'}</a>` : (j.title||'(untitled)')}${isNew?'<span class="badge-new">NEW</span>':''}</td>
+      <td>${j.category}</td>
+      <td>${j.team||'—'}</td>
+      <td>${j.location}</td>
+      <td>${j.first_seen}</td>
+      <td class="status-${j.status}">${j.status}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.querySelectorAll('th[data-key]').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const key = th.dataset.key;
+    if(sortKey===key) sortDir *= -1; else { sortKey=key; sortDir=1; }
+    applyFiltersAndRender();
+  });
+});
+['fCategory','fLocation','fStatus','fWindow'].forEach(id=>
+  document.getElementById(id).addEventListener('change', applyFiltersAndRender));
+document.getElementById('fSearch').addEventListener('input', applyFiltersAndRender);
+
+(async function init(){
+  const data = await loadData();
+  ALL_JOBS = Object.values(data.jobs || {});
+
+  document.getElementById('meta').innerHTML =
+    `<b>${ALL_JOBS.length}</b> jobs tracked · last scrape <b>${data.last_run || 'n/a'}</b>`;
+
+  if(ALL_JOBS.length===0){
+    document.querySelector('.wrap').insertAdjacentHTML('beforeend',
+      `<div class="empty">No data yet. Run <code>scraper.py</code> once (or wait for the scheduled GitHub Action) to populate data/jobs.json.</div>`);
+    return;
+  }
+
+  populateSelect('fCategory', [...new Set(ALL_JOBS.map(j=>j.category))]);
+  populateSelect('fLocation', [...new Set(ALL_JOBS.map(j=>j.location))]);
+
+  renderKPIs(ALL_JOBS);
+  renderTrendChart(ALL_JOBS);
+  renderLocChart(ALL_JOBS);
+  applyFiltersAndRender();
+})();
+</script>
+</body>
+</html>
